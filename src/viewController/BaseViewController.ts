@@ -2,7 +2,7 @@
  * Base class for ViewControllers with ViewData lifecycle hooks.
  */
 
-import { IContext, IContextBase } from "../context/types";
+import { IContext, IContextBase } from "../context/types.js";
 
 /**
  * Base class for ViewControllers.
@@ -43,7 +43,9 @@ export abstract class BaseViewController<TViewData> {
    *
    * @param context - Full context with ViewData loaded.
    */
-  static async onBeforeCall(context: IContext<TViewData>): Promise<void> {
+  static async onBeforeCall<TContextViewData>(
+    context: IContext<TContextViewData>
+  ): Promise<void> {
     void context;
   }
 }

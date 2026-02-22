@@ -2,7 +2,7 @@
  * In-memory refresh token store for the session stub.
  */
 
-import { IJwtClaims } from "./tokenService";
+import { IJwtClaims } from "./tokenService.js";
 
 /**
  * Stores refresh tokens in memory for validation.

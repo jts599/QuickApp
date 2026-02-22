@@ -2,7 +2,7 @@
  * ViewController registry used by the RPC runtime.
  */
 
-import { ICallableMetadata, IViewControllerConfig } from "./types";
+import { ICallableMetadata, IViewControllerConfig } from "./types.js";
 
 /**
  * Base type for a ViewController constructor.
@@ -12,7 +12,7 @@ export type ViewControllerConstructor = new (...args: never[]) => unknown;
 /**
  * Tracks metadata for registered controllers.
  */
-interface IViewControllerEntry {
+export interface IViewControllerEntry {
   /**
    * ViewController configuration.
    */
@@ -75,4 +75,13 @@ export function resolveViewController(
   key: string
 ): IViewControllerEntry | undefined {
   return controllerRegistry.get(key);
+}
+
+/**
+ * Lists all registered ViewControllers and their metadata.
+ *
+ * @returns Array of registered ViewController entries.
+ */
+export function listViewControllers(): IViewControllerEntry[] {
+  return Array.from(controllerRegistry.values());
 }

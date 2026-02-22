@@ -2,16 +2,19 @@
  * Public exports for the framework runtime.
  */
 
-export * from "./context/types";
-export * from "./http/types";
-export * from "./rpc/createViewRpcHandler";
-export * from "./session/types";
-export * from "./session/tokenService";
-export * from "./session/InMemoryRefreshTokenStore";
-export * from "./session/InMemorySessionManager";
-export * from "./viewController/BaseViewController";
-export * from "./viewController/decorators";
-export * from "./viewController/lockManager";
-export * from "./viewController/registry";
-export * from "./viewController/types";
-export * from "./viewController/viewDataStore";
+export * from "./context/types.js";
+export * from "./http/types.js";
+export * from "./http/expressAdapter.js";
+export * from "./http/expressAutoRoutes.js";
+export * from "./rpc/createViewRpcHandler.js";
+export * from "./session/types.js";
+export * from "./session/tokenService.js";
+export * from "./session/JwtTokenService.js";
+export * from "./session/InMemoryRefreshTokenStore.js";
+export * from "./session/InMemorySessionManager.js";
+export * from "./viewController/BaseViewController.js";
+export * from "./viewController/decorators.js";
+export * from "./viewController/lockManager.js";
+export * from "./viewController/registry.js";
+export * from "./viewController/types.js";
+export * from "./viewController/viewDataStore.js";

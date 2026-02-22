@@ -1,0 +1,29 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "test: all",
+      "type": "shell",
+      "command": "npm",
+      "args": ["test"],
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "test: unit",
+      "type": "shell",
+      "command": "node",
+      "args": ["--test", "--loader", "ts-node/esm", "test/unit"],
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "test: integration",
+      "type": "shell",
+      "command": "node",
+      "args": ["--test", "--loader", "ts-node/esm", "test/integration"],
+      "group": "test",
+      "problemMatcher": []
+    }
+  ]
+}

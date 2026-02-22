@@ -68,3 +68,42 @@ export class SampleViewController extends BaseViewController<ISampleViewData> {
 - No build/test commands are configured yet.
 - All code must follow `/.codex/instructions/CodeStyle.md` (mandatory documentation + low complexity).
 
+## Usage Example (Stub Session + RPC)
+```ts
+import {
+  createViewRpcHandler,
+  registerViewRpcRoutes,
+  InMemoryRefreshTokenStore,
+  InMemorySessionManager,
+  JwtTokenService,
+  ViewLockManager,
+} from "./src";
+
+const tokenService = new JwtTokenService({
+  secret: "dev-secret",
+  issuer: "quickapp-local",
+  audience: "quickapp-client",
+});
+
+const sessionManager = new InMemorySessionManager(
+  tokenService,
+  new InMemoryRefreshTokenStore(),
+  {
+    accessTokenTtlSeconds: 1800,
+    refreshTokenTtlSeconds: 7200,
+    defaultRoles: ["defaultRole"],
+  }
+);
+
+const handler = createViewRpcHandler({
+  sessionManager,
+  viewDataStore: /* SqliteViewDataStore instance */,
+  lockManager: new ViewLockManager(),
+  databaseConnection: /* SQLite db instance */,
+  logger: console,
+  requestIdFactory: () => crypto.randomUUID(),
+});
+
+// Auto-register with Express:
+// registerViewRpcRoutes(app, { ...same deps as above });
+```

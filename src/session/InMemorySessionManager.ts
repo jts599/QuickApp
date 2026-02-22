@@ -2,17 +2,18 @@
  * In-memory session manager stub for JWT-based authentication.
  */
 
-import { ISessionInfo } from "../context/types";
-import { IHttpRequest } from "../http/types";
+import { ISessionInfo } from "../context/types.js";
+import { randomUUID } from "crypto";
+import { IHttpRequest } from "../http/types.js";
 import {
   IAuthCredentials,
   IAuthResult,
   IRequireSessionResult,
   ISessionManager,
   ISessionTokens,
-} from "./types";
-import { IJwtClaims, ITokenService } from "./tokenService";
-import { InMemoryRefreshTokenStore } from "./InMemoryRefreshTokenStore";
+} from "./types.js";
+import { IJwtClaims, ITokenService } from "./tokenService.js";
+import { InMemoryRefreshTokenStore } from "./InMemoryRefreshTokenStore.js";
 
 /**
  * Configuration for the in-memory session manager.
@@ -69,12 +70,13 @@ export class InMemorySessionManager implements ISessionManager {
     const userId = this.resolveUserId(credentials);
     const roles = this.config.defaultRoles;
     const tokens = await this.createSession(userId, roles);
+    const claims = await this.tokenService.verifyAccessToken(tokens.accessToken);
 
     return {
       sessionInfo: {
         userId,
-        sessionId: this.extractSessionId(tokens.accessToken),
-        roles,
+        sessionId: claims.sid,
+        roles: claims.roles,
       },
       tokens,
     };
@@ -88,20 +90,8 @@ export class InMemorySessionManager implements ISessionManager {
    * @returns Session tokens for the new session.
    */
   async createSession(userId: string, roles: string[]): Promise<ISessionTokens> {
-    const sessionId = this.generateSessionId(userId);
-    const accessClaims = this.buildClaims(userId, sessionId, roles, this.config.accessTokenTtlSeconds);
-    const refreshClaims = this.buildClaims(userId, sessionId, roles, this.config.refreshTokenTtlSeconds);
-
-    const accessToken = await this.tokenService.signAccessToken(accessClaims);
-    const refreshToken = await this.tokenService.signRefreshToken(refreshClaims);
-
-    this.refreshTokenStore.save(refreshToken.token, refreshClaims);
-
-    return {
-      accessToken: accessToken.token,
-      refreshToken: refreshToken.token,
-      expiresAt: accessToken.expiresAt,
-    };
+    const sessionId = this.generateSessionId();
+    return this.issueTokens(userId, roles, sessionId);
   }
 
   /**
@@ -130,7 +120,11 @@ export class InMemorySessionManager implements ISessionManager {
       roles: claims.roles,
     };
 
-    const refreshedTokens = await this.createSession(claims.sub, claims.roles);
+    const refreshedTokens = await this.issueTokens(
+      claims.sub,
+      claims.roles,
+      claims.sid
+    );
 
     return {
       sessionInfo,
@@ -142,9 +136,38 @@ export class InMemorySessionManager implements ISessionManager {
     return credentials.userId ?? credentials.username ?? "anonymous";
   }
 
-  private generateSessionId(userId: string): string {
-    const timestamp = Date.now();
-    return `${userId}-${timestamp}`;
+  private generateSessionId(): string {
+    return randomUUID();
+  }
+
+  private async issueTokens(
+    userId: string,
+    roles: string[],
+    sessionId: string
+  ): Promise<ISessionTokens> {
+    const accessClaims = this.buildClaims(
+      userId,
+      sessionId,
+      roles,
+      this.config.accessTokenTtlSeconds
+    );
+    const refreshClaims = this.buildClaims(
+      userId,
+      sessionId,
+      roles,
+      this.config.refreshTokenTtlSeconds
+    );
+
+    const accessToken = await this.tokenService.signAccessToken(accessClaims);
+    const refreshToken = await this.tokenService.signRefreshToken(refreshClaims);
+
+    this.refreshTokenStore.save(refreshToken.token, refreshClaims);
+
+    return {
+      accessToken: accessToken.token,
+      refreshToken: refreshToken.token,
+      expiresAt: accessToken.expiresAt,
+    };
   }
 
   private buildClaims(
@@ -174,14 +197,5 @@ export class InMemorySessionManager implements ISessionManager {
     }
 
     return token;
-  }
-
-  private extractSessionId(accessToken: string): string {
-    const parts = accessToken.split(".");
-    if (parts.length < 2) {
-      return "unknown";
-    }
-
-    return parts[1];
   }
 }

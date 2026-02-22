@@ -1,0 +1,20 @@
+{
+  "name": "quickapp-sample",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "ts-node-esm server/index.ts",
+    "build": "tsc -p tsconfig.json",
+    "test": "echo 'No tests configured yet.' && exit 0"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.11.30",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.4.5"
+  }
+}

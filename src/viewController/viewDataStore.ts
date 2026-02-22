@@ -125,7 +125,7 @@ export class SqliteViewDataStore implements IViewDataStore {
    * @param data - Serialized JSON data.
    */
   async save(sessionId: string, viewKey: string, data: string): Promise<void> {
-    const statement = this.database.prepare<[string, string, string]>(
+    const statement = this.database.prepare<[string, string, string], unknown>(
       "INSERT INTO view_data (session_id, view_key, data, updated_at) VALUES (?, ?, ?, datetime('now')) " +
         "ON CONFLICT(session_id, view_key) DO UPDATE SET data = excluded.data, updated_at = datetime('now')"
     );
@@ -139,7 +139,7 @@ export class SqliteViewDataStore implements IViewDataStore {
    * @param viewKey - ViewController key.
    */
   async delete(sessionId: string, viewKey: string): Promise<void> {
-    const statement = this.database.prepare<[string, string]>(
+    const statement = this.database.prepare<[string, string], unknown>(
       "DELETE FROM view_data WHERE session_id = ? AND view_key = ?"
     );
     statement.run(sessionId, viewKey);

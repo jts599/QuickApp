@@ -2,8 +2,8 @@
  * Session handling interfaces for JWT-based authentication.
  */
 
-import { ISessionInfo } from "../context/types";
-import { IHttpRequest } from "../http/types";
+import { ISessionInfo } from "../context/types.js";
+import { IHttpRequest } from "../http/types.js";
 
 /**
  * Authentication credentials supplied during login.

@@ -2,13 +2,13 @@
  * Creates an RPC handler for ViewController calls.
  */
 
-import { IContext, IContextBase, ILogger } from "../context/types";
-import { IHttpRequest, IHttpResponse, NextFunction } from "../http/types";
-import { ISessionManager } from "../session/types";
-import { resolveViewController } from "../viewController/registry";
-import { ICallableResult } from "../viewController/types";
-import { IViewDataStore } from "../viewController/viewDataStore";
-import { ViewLockManager } from "../viewController/lockManager";
+import { IContext, IContextBase, ILogger } from "../context/types.js";
+import { IHttpRequest, IHttpResponse, NextFunction } from "../http/types.js";
+import { ISessionManager } from "../session/types.js";
+import { resolveViewController } from "../viewController/registry.js";
+import { ICallableResult } from "../viewController/types.js";
+import { IViewDataStore } from "../viewController/viewDataStore.js";
+import { ViewLockManager } from "../viewController/lockManager.js";
 
 /**
  * Non-nullable controller registry entry type.

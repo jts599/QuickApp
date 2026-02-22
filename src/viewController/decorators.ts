@@ -2,9 +2,9 @@
  * Decorators for ViewController configuration and callable methods.
  */
 
-import { ICallableConfig, ICallableMetadata, IViewControllerConfig } from "./types";
-import { registerCallables, registerViewController } from "./registry";
-import { ViewControllerConstructor } from "./registry";
+import { ICallableConfig, ICallableMetadata, IViewControllerConfig } from "./types.js";
+import { registerCallables, registerViewController } from "./registry.js";
+import { ViewControllerConstructor } from "./registry.js";
 
 /**
  * Decorator that registers a ViewController with the runtime registry.
