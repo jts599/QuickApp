@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit",
+    "generate:client": "npm run build --silent && node dist/client/generator/cli.js",
     "build": "tsc -p tsconfig.build.json && node scripts/copy-migration-assets.mjs",
     "test": "node --test --loader ts-node/esm"
   },

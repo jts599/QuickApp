@@ -3,6 +3,7 @@
  */
 
 export * from "./context/types.js";
+export * from "./client/runtime.js";
 export * from "./http/types.js";
 export * from "./http/expressAdapter.js";
 export * from "./http/expressAutoRoutes.js";

@@ -15,7 +15,7 @@ Implemented core pieces:
 - Sample controller in `sampleImplementation/server/sample.ts`.
 
 Missing pieces:
-- Client generator for typed ViewController calls + per-view mutex.
+- Client generation integration in editor/CI workflows (core per-file generator exists).
 - Runtime configuration docs and production hardening.
 
 ## Directory Layout
@@ -72,12 +72,21 @@ export class SampleViewController extends BaseViewController<ISampleViewData> {
 ## Development Notes
 - Root commands:
   - `npm run typecheck`
+  - `npm run generate:client -- --controller sampleImplementation/server/sample.ts`
   - `npm run build`
   - `npm test`
 - Sample commands:
   - `cd sampleImplementation && npm run build`
   - `cd sampleImplementation && npm run migrate`
 - All code must follow `/.codex/instructions/CodeStyle.md` (mandatory documentation + low complexity).
+
+## Client Generation
+- Generator is per-file and explicit:
+  - `npm run generate:client -- --controller sampleImplementation/server/sample.ts`
+- For each controller file, generation writes:
+  - `sampleImplementation/client/<name>.generated.ts` (always overwritten)
+  - `sampleImplementation/client/<name>.ts` (created only if missing, preserved afterwards)
+- Generated classes extend `ClientViewControllerBase<TViewData>` and call server RPC methods through constructor-injected runtime dependencies.
 
 ## Usage Example (Stub Session + RPC)
 ```ts

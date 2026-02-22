@@ -1,4 +1,5 @@
 # sampleImplementation/client
-Placeholder for sample client integration code.
+Generated and custom client code for sample ViewControllers.
 
-- Add generated/typed client usage examples here.
+- `*.generated.ts`: auto-generated classes (overwritten by generator).
+- `*.ts`: developer wrappers extending generated classes (preserved).
