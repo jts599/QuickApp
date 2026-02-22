@@ -3,12 +3,13 @@
     "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
+    "experimentalDecorators": true,
     "outDir": "dist",
-    "rootDir": ".",
+    "rootDir": "..",
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["server/**/*.ts"]
+  "include": ["server/**/*.ts", "../src/**/*.ts"]
 }

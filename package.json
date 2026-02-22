@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json",
     "test": "node --test --loader ts-node/esm"
   },
   "dependencies": {
