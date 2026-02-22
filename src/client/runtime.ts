@@ -339,6 +339,18 @@ export abstract class ClientViewControllerBase<TViewData> {
       return response.body as IClientCallableResult<TResult, TViewData>;
     });
   }
+
+  /**
+   * Loads server-managed view data for this view instance.
+   *
+   * This method explicitly invokes the reserved `__loadData` RPC call and returns
+   * the same callable result shape used by generated methods.
+   *
+   * @returns Load result containing `null` method result and immutable view data.
+   */
+  async loadData(): Promise<IClientCallableResult<null, TViewData>> {
+    return this.invokeMethod<null>("__loadData", null);
+  }
 }
 
 /**

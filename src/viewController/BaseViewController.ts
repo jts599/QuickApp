@@ -3,6 +3,7 @@
  */
 
 import { IContext, IContextBase } from "../context/types.js";
+import { IViewDataStore } from "./viewDataStore.js";
 
 /**
  * Base class for ViewControllers.
@@ -36,6 +37,37 @@ export abstract class BaseViewController<TViewData> {
    */
   static async authorize(context: IContextBase): Promise<void> {
     void context;
+  }
+
+  /**
+   * Loads persisted view data for a session/view pair, creating and saving it when missing.
+   *
+   * @typeParam TLoadedViewData - Concrete view data type resolved by the caller.
+   * @param context - Base context without hydrated view data.
+   * @param sessionId - Session identifier used for persistence lookup.
+   * @param viewKey - ViewController key used for persistence lookup.
+   * @param viewDataStore - Store implementation used to load and save serialized view data.
+   * @returns Hydrated or newly created view data.
+   */
+  static async loadData<TLoadedViewData>(
+    context: IContextBase,
+    sessionId: string,
+    viewKey: string,
+    viewDataStore: IViewDataStore
+  ): Promise<TLoadedViewData> {
+    const record = await viewDataStore.load(sessionId, viewKey);
+    if (record) {
+      return JSON.parse(record.data) as TLoadedViewData;
+    }
+
+    const createdViewData = await this.createViewData(context);
+    await viewDataStore.save(
+      sessionId,
+      viewKey,
+      JSON.stringify(createdViewData ?? null)
+    );
+
+    return createdViewData as TLoadedViewData;
   }
 
   /**

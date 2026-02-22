@@ -9,6 +9,7 @@ import { resolveViewController } from "../viewController/registry.js";
 import { ICallableResult } from "../viewController/types.js";
 import { IViewDataStore } from "../viewController/viewDataStore.js";
 import { ViewLockManager } from "../viewController/lockManager.js";
+import { BaseViewController } from "../viewController/BaseViewController.js";
 
 /**
  * Non-nullable controller registry entry type.
@@ -96,6 +97,20 @@ interface IResolvedCallable {
 }
 
 /**
+ * Resolves a ViewController entry by key.
+ *
+ * @param controllerKey - ViewController key from route params.
+ * @returns Resolved controller entry.
+ */
+function resolveControllerEntry(controllerKey: string): ViewControllerEntry {
+  const entry = resolveViewController(controllerKey);
+  if (!entry) {
+    throw new Error("ViewController not found.");
+  }
+  return entry;
+}
+
+/**
  * Extracts and validates the RPC request body.
  *
  * @param request - Incoming request.
@@ -120,10 +135,7 @@ function resolveCallable(
   controllerKey: string,
   methodKey: string
 ): IResolvedCallable {
-  const entry = resolveViewController(controllerKey);
-  if (!entry) {
-    throw new Error("ViewController not found.");
-  }
+  const entry = resolveControllerEntry(controllerKey);
 
   const callable = entry.callables.find((item) => item.config.key === methodKey);
   if (!callable) {
@@ -225,6 +237,16 @@ async function loadOrCreateViewData(
   sessionId: string,
   controllerKey: string
 ): Promise<unknown> {
+  const controllerWithLoadData = entry.controller as unknown as typeof BaseViewController;
+  if (typeof controllerWithLoadData.loadData === "function") {
+    return controllerWithLoadData.loadData(
+      baseContext,
+      sessionId,
+      controllerKey,
+      dependencies.viewDataStore
+    );
+  }
+
   const record = await dependencies.viewDataStore.load(sessionId, controllerKey);
   if (record) {
     return JSON.parse(record.data);
@@ -305,10 +327,19 @@ export function createViewRpcHandler(
       }
 
       const body = parseRequestBody(request);
-      const resolved = resolveCallable(controllerKey, body.method);
+      const isLoadDataMethod = body.method === "__loadData";
+      const resolved = isLoadDataMethod
+        ? undefined
+        : resolveCallable(controllerKey, body.method);
+      const entry = resolved?.entry ?? resolveControllerEntry(controllerKey);
+      const callable = resolved?.callable;
       const sessionResult = await dependencies.sessionManager.requireSession(request);
       const sessionInfo = sessionResult.sessionInfo;
-      assertRoleAccess(resolved.entry, resolved.callable, sessionInfo.roles);
+      if (callable) {
+        assertRoleAccess(entry, callable, sessionInfo.roles);
+      } else if (!hasRequiredRole(sessionInfo.roles, entry.config.roles)) {
+        throw new Error("Forbidden.");
+      }
       const lockRelease = await dependencies.lockManager.acquire(
         sessionInfo.sessionId,
         controllerKey
@@ -319,36 +350,40 @@ export function createViewRpcHandler(
           writeRefreshedTokens(response, sessionResult.refreshedTokens);
         }
         const baseContext = buildBaseContext(dependencies, sessionInfo);
-        if (typeof (resolved.entry.controller as any).authorize === "function") {
-          await (resolved.entry.controller as any).authorize(baseContext);
+        if (typeof (entry.controller as any).authorize === "function") {
+          await (entry.controller as any).authorize(baseContext);
         }
 
         const viewData = await loadOrCreateViewData(
           dependencies,
-          resolved.entry,
+          entry,
           baseContext,
           sessionInfo.sessionId,
           controllerKey
         );
         const context: IContext<unknown> = { ...baseContext, viewData };
 
-        if (typeof (resolved.entry.controller as any).onBeforeCall === "function") {
-          await (resolved.entry.controller as any).onBeforeCall(context);
+        if (!isLoadDataMethod && typeof (entry.controller as any).onBeforeCall === "function") {
+          await (entry.controller as any).onBeforeCall(context);
         }
 
-        const result = await executeCallable(
-          resolved.entry,
-          resolved.callable,
-          body.args,
-          context
-        );
+        const result = isLoadDataMethod
+          ? null
+          : await executeCallable(
+              entry,
+              callable as CallableMetadata,
+              body.args,
+              context
+            );
 
-        await persistViewData(
-          dependencies,
-          sessionInfo.sessionId,
-          controllerKey,
-          context.viewData
-        );
+        if (!isLoadDataMethod) {
+          await persistViewData(
+            dependencies,
+            sessionInfo.sessionId,
+            controllerKey,
+            context.viewData
+          );
+        }
 
         const payload: ICallableResult<unknown, unknown> = {
           result,
