@@ -115,7 +115,8 @@ function extractMethodJsDoc(
  */
 function parseCallableMethods(
   classDeclaration: ts.ClassDeclaration,
-  sourceText: string
+  sourceText: string,
+  sourceFile: ts.SourceFile
 ): IDiscoveredCallableMethod[] {
   const methods: IDiscoveredCallableMethod[] = [];
 
@@ -142,6 +143,13 @@ function parseCallableMethods(
     methods.push({
       methodName: member.name.text,
       rpcMethodKey,
+      argsType: member.parameters[0]?.type?.getText(sourceFile) ?? "unknown",
+      returnType:
+        member.type &&
+        ts.isTypeReferenceNode(member.type) &&
+        member.type.typeArguments?.[0]
+          ? member.type.typeArguments[0].getText(sourceFile)
+          : "unknown",
       jsDoc: extractMethodJsDoc(member, sourceText),
     });
   }
@@ -184,7 +192,14 @@ export async function parseControllerFile(
       continue;
     }
 
-    const callables = parseCallableMethods(statement, sourceText);
+    const viewDataType =
+      statement.heritageClauses
+        ?.flatMap((clause) => clause.types)
+        .find((typeNode) => typeNode.expression.getText(sourceFile).includes("BaseViewController"))
+        ?.typeArguments?.[0]
+        ?.getText(sourceFile) ?? "unknown";
+
+    const callables = parseCallableMethods(statement, sourceText, sourceFile);
     if (callables.length === 0) {
       continue;
     }
@@ -192,6 +207,7 @@ export async function parseControllerFile(
     controllers.push({
       className: statement.name.text,
       viewKey,
+      viewDataType,
       callables,
     });
   }

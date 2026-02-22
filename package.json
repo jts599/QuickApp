@@ -5,9 +5,10 @@
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit",
+    "lint": "node scripts/lint-boundaries.mjs",
     "generate:client": "npm run build --silent && node dist/client/generator/cli.js",
     "build": "tsc -p tsconfig.build.json && node scripts/copy-migration-assets.mjs",
-    "test": "node --test --loader ts-node/esm"
+    "test": "npm run lint && node --test --loader ts-node/esm"
   },
   "dependencies": {
     "express": "^4.21.2"

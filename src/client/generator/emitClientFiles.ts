@@ -32,8 +32,8 @@ function toRelativeImport(fromFilePath: string, targetFilePath: string): string 
  * @returns Generated method source.
  */
 function renderGeneratedMethod(
-  className: string,
-  callable: IDiscoveredCallableMethod
+  callable: IDiscoveredCallableMethod,
+  viewDataType: string
 ): string {
   const cleanedJsDoc =
     callable.jsDoc
@@ -43,17 +43,25 @@ function renderGeneratedMethod(
   const methodDoc = cleanedJsDoc ? `\n${cleanedJsDoc}\n` : "";
 
   return `${methodDoc}  async ${callable.methodName}(\n` +
-    `    args: ClientControllerMethodArgs<typeof ${className}, "${callable.methodName}">\n` +
+    `    args: ${callable.argsType}\n` +
     `  ): Promise<\n` +
     `    IClientCallableResult<\n` +
-    `      ClientControllerMethodResult<typeof ${className}, "${callable.methodName}">,\n` +
-    `      ClientControllerViewData<typeof ${className}>\n` +
+    `      ${callable.returnType},\n` +
+    `      ${viewDataType}\n` +
     `    >\n` +
     `  > {\n` +
-    `    return this.invokeMethod<\n` +
-    `      ClientControllerMethodResult<typeof ${className}, "${callable.methodName}">\n` +
-    `    >("${callable.rpcMethodKey}", args);\n` +
+    `    return this.invokeMethod<${callable.returnType}>("${callable.rpcMethodKey}", args);\n` +
     `  }\n`;
+}
+
+/**
+ * Returns true when type text is a simple identifier import candidate.
+ *
+ * @param typeText - Type text to inspect.
+ * @returns Whether the type can be imported by name.
+ */
+function isImportableNamedType(typeText: string): boolean {
+  return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(typeText.trim());
 }
 
 /**
@@ -67,12 +75,32 @@ function renderGeneratedFile(options: IEmitGeneratedControllerOptions): string {
     options.generatedFilePath,
     path.resolve(process.cwd(), "src/client/runtime.ts")
   );
-  const serverImportPath = toRelativeImport(options.generatedFilePath, options.sourceFilePath);
+  const modelImportPath = toRelativeImport(options.generatedFilePath, options.modelFilePath);
   const generatedClassName = `${options.controller.className}Generated`;
 
   const methodsSource = options.controller.callables
-    .map((callable) => renderGeneratedMethod(options.controller.className, callable))
+    .map((callable) => renderGeneratedMethod(callable, options.controller.viewDataType))
     .join("\n");
+
+  const importableTypeNames = new Set<string>();
+  if (isImportableNamedType(options.controller.viewDataType)) {
+    importableTypeNames.add(options.controller.viewDataType);
+  }
+  for (const callable of options.controller.callables) {
+    if (isImportableNamedType(callable.argsType)) {
+      importableTypeNames.add(callable.argsType);
+    }
+    if (isImportableNamedType(callable.returnType)) {
+      importableTypeNames.add(callable.returnType);
+    }
+  }
+
+  const modelImportBlock =
+    importableTypeNames.size > 0
+      ? `import type {\n${Array.from(importableTypeNames)
+          .map((typeName) => `  ${typeName},`)
+          .join("\n")}\n} from "${modelImportPath}";\n\n`
+      : "";
 
   return `/**\n` +
     ` * AUTO-GENERATED FILE.\n` +
@@ -81,16 +109,13 @@ function renderGeneratedFile(options: IEmitGeneratedControllerOptions): string {
     ` * Do not edit manually; extend the wrapper class instead.\n` +
     ` */\n\n` +
     `import {\n` +
-    `  ClientControllerMethodArgs,\n` +
-    `  ClientControllerMethodResult,\n` +
-    `  ClientControllerViewData,\n` +
     `  ClientViewControllerBase,\n` +
     `  IClientCallableResult,\n` +
     `  IClientRuntime,\n` +
     `} from "${runtimeImportPath}";\n` +
-    `import type { ${options.controller.className} } from "${serverImportPath}";\n\n` +
+    `${modelImportBlock}` +
     `export class ${generatedClassName} extends ClientViewControllerBase<\n` +
-    `  ClientControllerViewData<typeof ${options.controller.className}>\n` +
+    `  ${options.controller.viewDataType}\n` +
     `> {\n` +
     `  constructor(runtime: IClientRuntime) {\n` +
     `    super(runtime, "${options.controller.viewKey}");\n` +

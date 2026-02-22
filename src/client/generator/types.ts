@@ -17,6 +17,16 @@ export interface IDiscoveredCallableMethod {
   rpcMethodKey: string;
 
   /**
+   * Method argument type text.
+   */
+  argsType: string;
+
+  /**
+   * Method return payload type text (inside Promise<>).
+   */
+  returnType: string;
+
+  /**
    * Optional JSDoc block for the method.
    */
   jsDoc?: string;
@@ -35,6 +45,11 @@ export interface IDiscoveredController {
    * RPC route key from `@ViewController({ key })`.
    */
   viewKey: string;
+
+  /**
+   * View data type used by `BaseViewController<TViewData>`.
+   */
+  viewDataType: string;
 
   /**
    * List of callable methods declared on this controller.
@@ -90,6 +105,11 @@ export interface IEmitGeneratedControllerOptions {
    * Absolute path to source server file.
    */
   sourceFilePath: string;
+
+  /**
+   * Absolute path to shared model file containing referenced contracts.
+   */
+  modelFilePath: string;
 
   /**
    * Absolute path to generated implementation output.

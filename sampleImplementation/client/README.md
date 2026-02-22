@@ -3,3 +3,4 @@ Generated and custom client code for sample ViewControllers.
 
 - `*.generated.ts`: auto-generated classes (overwritten by generator).
 - `*.ts`: developer wrappers extending generated classes (preserved).
+- Shared contracts are imported from `sampleImplementation/models/` (no server class imports).

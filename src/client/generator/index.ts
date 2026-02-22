@@ -70,6 +70,10 @@ export async function generateClientForFile(
     options.rootDirectory,
     absoluteSourceFilePath
   );
+  const modelFilePath = absoluteSourceFilePath.replace(
+    `${path.sep}server${path.sep}`,
+    `${path.sep}models${path.sep}`
+  );
 
   const outputs: IGenerateClientResultItem[] = [];
   const hasMultipleControllers = parseResult.controllers.length > 1;
@@ -89,6 +93,7 @@ export async function generateClientForFile(
 
     await emitGeneratedControllerFiles({
       sourceFilePath: absoluteSourceFilePath,
+      modelFilePath,
       generatedFilePath: generatedClassFilePath,
       wrapperFilePath: wrapperClassFilePath,
       controller,

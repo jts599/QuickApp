@@ -26,7 +26,7 @@
   - Integration: RPC handler flow/state/role checks, migration idempotency and dialect checks.
 
 ## What Still Needs To Be Done
-- Implement client generation for typed ViewController methods + per-view mutex.
+- Integrate client generation into editor workflows and CI checks (core per-file generation exists).
 - Add React integration guidance or helper for `static Component` usage.
 - Expand production hardening for session/storage implementations (persistent stores, key rotation, operational settings).
 - Document runtime configuration in more detail (framework DB path, app DB separation, session settings, logger conventions).
@@ -39,3 +39,5 @@
 - Client should enforce a per-view mutex to prevent concurrent in-flight calls.
 - Framework DB migrations are manually invoked (no auto-run on server start by default).
 - Framework DB and app DB are treated as separate concerns in sample server wiring.
+- Client generation is per-file and explicit via `npm run generate:client -- --controller <server-file>`.
+- Generated client files are overwritten in `*.generated.ts`; wrapper `*.ts` files are preserved if already present.

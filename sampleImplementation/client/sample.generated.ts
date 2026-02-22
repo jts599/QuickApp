@@ -6,17 +6,18 @@
  */
 
 import {
-  ClientControllerMethodArgs,
-  ClientControllerMethodResult,
-  ClientControllerViewData,
   ClientViewControllerBase,
   IClientCallableResult,
   IClientRuntime,
 } from "../../src/client/runtime.js";
-import type { SampleViewController } from "../server/sample.js";
+import type {
+  ISampleViewData,
+  ISampleViewControllerMethodArgs,
+  ISampleViewControllerMethodReturn,
+} from "../models/sample.js";
 
 export class SampleViewControllerGenerated extends ClientViewControllerBase<
-  ClientControllerViewData<typeof SampleViewController>
+  ISampleViewData
 > {
   constructor(runtime: IClientRuntime) {
     super(runtime, "SampleView");
@@ -30,15 +31,13 @@ export class SampleViewControllerGenerated extends ClientViewControllerBase<
    * @returns Method result containing the formatted message.
    */
   async SampleViewControllerMethod(
-    args: ClientControllerMethodArgs<typeof SampleViewController, "SampleViewControllerMethod">
+    args: ISampleViewControllerMethodArgs
   ): Promise<
     IClientCallableResult<
-      ClientControllerMethodResult<typeof SampleViewController, "SampleViewControllerMethod">,
-      ClientControllerViewData<typeof SampleViewController>
+      ISampleViewControllerMethodReturn,
+      ISampleViewData
     >
   > {
-    return this.invokeMethod<
-      ClientControllerMethodResult<typeof SampleViewController, "SampleViewControllerMethod">
-    >("SampleViewControllerMethod", args);
+    return this.invokeMethod<ISampleViewControllerMethodReturn>("SampleViewControllerMethod", args);
   }
 }

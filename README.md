@@ -9,6 +9,7 @@ Implemented core pieces:
 - `BaseViewController<T>` lifecycle hooks, including `createViewData`.
 - Context split (`IContextBase`, `IContext<T>`).
 - SQLite-backed ViewData store (`SqliteViewDataStore`).
+- Per-file client generation and client runtime (`src/client/`).
 - Framework migration subsystem with SQLite runner and versioned SQL files (`src/migrations/`).
 - Per-session view lock manager.
 - RPC handler for `POST /rpc/view/:key` with `{ method, args }`.
@@ -72,6 +73,7 @@ export class SampleViewController extends BaseViewController<ISampleViewData> {
 ## Development Notes
 - Root commands:
   - `npm run typecheck`
+  - `npm run lint`
   - `npm run generate:client -- --controller sampleImplementation/server/sample.ts`
   - `npm run build`
   - `npm test`
@@ -87,6 +89,8 @@ export class SampleViewController extends BaseViewController<ISampleViewData> {
   - `sampleImplementation/client/<name>.generated.ts` (always overwritten)
   - `sampleImplementation/client/<name>.ts` (created only if missing, preserved afterwards)
 - Generated classes extend `ClientViewControllerBase<TViewData>` and call server RPC methods through constructor-injected runtime dependencies.
+- Shared contracts consumed by generated clients should live in `sampleImplementation/models/` so clients do not import server implementation files.
+- Boundary lint enforces this rule (`npm run lint`) and `npm test` runs it automatically.
 
 ## Usage Example (Stub Session + RPC)
 ```ts

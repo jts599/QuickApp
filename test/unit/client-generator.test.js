@@ -39,6 +39,9 @@ test("parseControllerFile discovers controller key and callable metadata", async
     sample.callables.map((callable) => callable.rpcMethodKey),
     ["SampleViewControllerMethod"]
   );
+  assert.equal(sample.viewDataType, "ISampleViewData");
+  assert.equal(sample.callables[0].argsType, "ISampleViewControllerMethodArgs");
+  assert.equal(sample.callables[0].returnType, "ISampleViewControllerMethodReturn");
 });
 
 test("emitGeneratedControllerFiles writes generated file and preserves existing wrapper", async () => {
@@ -46,24 +49,31 @@ test("emitGeneratedControllerFiles writes generated file and preserves existing 
   const sourceFilePath = path.join(tempDir, "sampleImplementation/server/sample.ts");
   const generatedFilePath = path.join(tempDir, "sampleImplementation/client/sample.generated.ts");
   const wrapperFilePath = path.join(tempDir, "sampleImplementation/client/sample.ts");
+  const modelFilePath = path.join(tempDir, "sampleImplementation/models/sample.ts");
 
   await fs.mkdir(path.dirname(sourceFilePath), { recursive: true });
   await fs.writeFile(sourceFilePath, "export class SampleViewController {}", "utf8");
+  await fs.mkdir(path.dirname(modelFilePath), { recursive: true });
+  await fs.writeFile(modelFilePath, "export interface ISampleViewData {}", "utf8");
 
   await fs.mkdir(path.dirname(wrapperFilePath), { recursive: true });
   await fs.writeFile(wrapperFilePath, "// keep me", "utf8");
 
   await emitGeneratedControllerFiles({
     sourceFilePath,
+    modelFilePath,
     generatedFilePath,
     wrapperFilePath,
     controller: {
       className: "SampleViewController",
       viewKey: "SampleView",
+      viewDataType: "ISampleViewData",
       callables: [
         {
           methodName: "SampleViewControllerMethod",
           rpcMethodKey: "SampleViewControllerMethod",
+          argsType: "ISampleViewControllerMethodArgs",
+          returnType: "ISampleViewControllerMethodReturn",
         },
       ],
     },
@@ -74,6 +84,7 @@ test("emitGeneratedControllerFiles writes generated file and preserves existing 
 
   assert.match(generated, /SampleViewControllerGenerated/);
   assert.match(generated, /invokeMethod/);
+  assert.match(generated, /from \"..\/models\/sample\.js\"/);
   assert.equal(wrapper, "// keep me");
 });
 
@@ -110,5 +121,6 @@ test("generateClientForFile emits mirrored client files in temp workspace", asyn
 
   assert.match(generated, /DemoViewControllerGenerated/);
   assert.match(generated, /"Ping"/);
+  assert.doesNotMatch(generated, /from \"..\/server\//);
   assert.match(wrapper, /extends DemoViewControllerGenerated/);
 });
