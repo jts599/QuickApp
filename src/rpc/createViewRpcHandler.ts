@@ -11,6 +11,16 @@ import { IViewDataStore } from "../viewController/viewDataStore";
 import { ViewLockManager } from "../viewController/lockManager";
 
 /**
+ * Non-nullable controller registry entry type.
+ */
+type ViewControllerEntry = NonNullable<ReturnType<typeof resolveViewController>>;
+
+/**
+ * Callable metadata type derived from a controller entry.
+ */
+type CallableMetadata = ViewControllerEntry["callables"][number];
+
+/**
  * Shape of the RPC request body.
  */
 export interface IViewRpcRequestBody {
@@ -61,6 +71,178 @@ export interface IViewRpcHandlerDependencies {
 }
 
 /**
+ * Represents a resolved controller + method pair.
+ */
+interface IResolvedCallable {
+  /**
+   * ViewController key.
+   */
+  controllerKey: string;
+
+  /**
+   * Callable method key.
+   */
+  methodKey: string;
+
+  /**
+   * Registered ViewController entry.
+   */
+  entry: ViewControllerEntry;
+
+  /**
+   * Callable metadata for the method.
+   */
+  callable: CallableMetadata;
+}
+
+/**
+ * Extracts and validates the RPC request body.
+ *
+ * @param request - Incoming request.
+ * @returns Parsed request body.
+ */
+function parseRequestBody(request: IHttpRequest): IViewRpcRequestBody {
+  const body = request.body as IViewRpcRequestBody;
+  if (!body || !body.method) {
+    throw new Error("Missing method in request body.");
+  }
+  return body;
+}
+
+/**
+ * Resolves a ViewController entry and callable metadata.
+ *
+ * @param controllerKey - ViewController key from the route.
+ * @param methodKey - Method key from the request.
+ * @returns Resolved controller and callable metadata.
+ */
+function resolveCallable(
+  controllerKey: string,
+  methodKey: string
+): IResolvedCallable {
+  const entry = resolveViewController(controllerKey);
+  if (!entry) {
+    throw new Error("ViewController not found.");
+  }
+
+  const callable = entry.callables.find((item) => item.config.key === methodKey);
+  if (!callable) {
+    throw new Error("Callable method not found.");
+  }
+
+  return { controllerKey, methodKey, entry, callable };
+}
+
+/**
+ * Writes refreshed tokens to the response headers.
+ *
+ * @param response - HTTP response.
+ * @param refreshedTokens - Tokens issued by the session manager.
+ */
+function writeRefreshedTokens(
+  response: IHttpResponse,
+  refreshedTokens: { accessToken: string; refreshToken: string; expiresAt: string }
+): void {
+  response.setHeader("x-access-token", refreshedTokens.accessToken);
+  response.setHeader("x-refresh-token", refreshedTokens.refreshToken);
+  response.setHeader("x-access-token-expires-at", refreshedTokens.expiresAt);
+}
+
+/**
+ * Builds a base context for the request.
+ *
+ * @param dependencies - Handler dependencies.
+ * @param sessionInfo - Session info from authentication.
+ * @returns Base context.
+ */
+function buildBaseContext(
+  dependencies: IViewRpcHandlerDependencies,
+  sessionInfo: IContextBase["sessionInfo"]
+): IContextBase {
+  return {
+    requestId: dependencies.requestIdFactory(),
+    databaseConnection: dependencies.databaseConnection,
+    logger: dependencies.logger,
+    sessionInfo,
+  };
+}
+
+/**
+ * Loads view data for a session/controller pair, creating it if missing.
+ *
+ * @param dependencies - Handler dependencies.
+ * @param entry - Resolved controller entry.
+ * @param baseContext - Base execution context.
+ * @param sessionId - Session identifier.
+ * @param controllerKey - ViewController key.
+ * @returns Hydrated view data.
+ */
+async function loadOrCreateViewData(
+  dependencies: IViewRpcHandlerDependencies,
+  entry: ViewControllerEntry,
+  baseContext: IContextBase,
+  sessionId: string,
+  controllerKey: string
+): Promise<unknown> {
+  const record = await dependencies.viewDataStore.load(sessionId, controllerKey);
+  if (record) {
+    return JSON.parse(record.data);
+  }
+
+  if (typeof (entry.controller as any).createViewData !== "function") {
+    throw new Error("ViewData initializer missing.");
+  }
+
+  const viewData = await (entry.controller as any).createViewData(baseContext);
+  await dependencies.viewDataStore.save(
+    sessionId,
+    controllerKey,
+    JSON.stringify(viewData ?? null)
+  );
+  return viewData;
+}
+
+/**
+ * Persists updated view data for the session.
+ *
+ * @param dependencies - Handler dependencies.
+ * @param sessionId - Session identifier.
+ * @param controllerKey - ViewController key.
+ * @param viewData - View data to persist.
+ */
+async function persistViewData(
+  dependencies: IViewRpcHandlerDependencies,
+  sessionId: string,
+  controllerKey: string,
+  viewData: unknown
+): Promise<void> {
+  await dependencies.viewDataStore.save(
+    sessionId,
+    controllerKey,
+    JSON.stringify(viewData ?? null)
+  );
+}
+
+/**
+ * Executes a callable method for a ViewController.
+ *
+ * @param entry - Resolved controller entry.
+ * @param callable - Callable metadata.
+ * @param args - Arguments passed from the client.
+ * @param context - Request context with view data.
+ * @returns Method result.
+ */
+async function executeCallable(
+  entry: ViewControllerEntry,
+  callable: CallableMetadata,
+  args: unknown,
+  context: IContext<unknown>
+): Promise<unknown> {
+  const method = (entry.controller as any)[callable.methodName];
+  return method(args, context);
+}
+
+/**
  * Creates a handler that executes ViewController methods.
  *
  * @param dependencies - Handler dependencies.
@@ -81,77 +263,49 @@ export function createViewRpcHandler(
         return;
       }
 
-      const body = request.body as IViewRpcRequestBody;
-      if (!body || !body.method) {
-        response.status(400).json({ error: "Missing method in request body." });
-        return;
-      }
-
-      const entry = resolveViewController(controllerKey);
-      if (!entry) {
-        response.status(404).json({ error: "ViewController not found." });
-        return;
-      }
-
-      const callable = entry.callables.find((item) => item.config.key === body.method);
-      if (!callable) {
-        response.status(404).json({ error: "Callable method not found." });
-        return;
-      }
-
-      const sessionInfo = await dependencies.sessionManager.requireSession(request);
+      const body = parseRequestBody(request);
+      const resolved = resolveCallable(controllerKey, body.method);
+      const sessionResult = await dependencies.sessionManager.requireSession(request);
+      const sessionInfo = sessionResult.sessionInfo;
       const lockRelease = await dependencies.lockManager.acquire(
         sessionInfo.sessionId,
         controllerKey
       );
 
       try {
-        const baseContext: IContextBase = {
-          requestId: dependencies.requestIdFactory(),
-          databaseConnection: dependencies.databaseConnection,
-          logger: dependencies.logger,
-          sessionInfo,
-        };
-
-        if (typeof (entry.controller as any).authorize === "function") {
-          await (entry.controller as any).authorize(baseContext);
+        if (sessionResult.refreshedTokens) {
+          writeRefreshedTokens(response, sessionResult.refreshedTokens);
+        }
+        const baseContext = buildBaseContext(dependencies, sessionInfo);
+        if (typeof (resolved.entry.controller as any).authorize === "function") {
+          await (resolved.entry.controller as any).authorize(baseContext);
         }
 
-        const record = await dependencies.viewDataStore.load(
+        const viewData = await loadOrCreateViewData(
+          dependencies,
+          resolved.entry,
+          baseContext,
           sessionInfo.sessionId,
           controllerKey
         );
+        const context: IContext<unknown> = { ...baseContext, viewData };
 
-        let viewData = record ? JSON.parse(record.data) : undefined;
-        if (!record) {
-          if (typeof (entry.controller as any).createViewData !== "function") {
-            response.status(500).json({ error: "ViewData initializer missing." });
-            return;
-          }
-          viewData = await (entry.controller as any).createViewData(baseContext);
-          await dependencies.viewDataStore.save(
-            sessionInfo.sessionId,
-            controllerKey,
-            JSON.stringify(viewData ?? null)
-          );
+        if (typeof (resolved.entry.controller as any).onBeforeCall === "function") {
+          await (resolved.entry.controller as any).onBeforeCall(context);
         }
 
-        const context: IContext<unknown> = {
-          ...baseContext,
-          viewData,
-        };
+        const result = await executeCallable(
+          resolved.entry,
+          resolved.callable,
+          body.args,
+          context
+        );
 
-        if (typeof (entry.controller as any).onBeforeCall === "function") {
-          await (entry.controller as any).onBeforeCall(context);
-        }
-
-        const method = (entry.controller as any)[callable.methodName];
-        const result = await method(body.args, context);
-
-        await dependencies.viewDataStore.save(
+        await persistViewData(
+          dependencies,
           sessionInfo.sessionId,
           controllerKey,
-          JSON.stringify(context.viewData ?? null)
+          context.viewData
         );
 
         const payload: ICallableResult<unknown, unknown> = {
@@ -164,8 +318,24 @@ export function createViewRpcHandler(
         lockRelease();
       }
     } catch (error) {
+      const message = error instanceof Error ? error.message : "Unexpected server error.";
       if (next) {
         next(error as Error);
+        return;
+      }
+      if (
+        message === "Missing method in request body." ||
+        message === "Missing view controller key."
+      ) {
+        response.status(400).json({ error: message });
+        return;
+      }
+      if (message === "ViewController not found." || message === "Callable method not found.") {
+        response.status(404).json({ error: message });
+        return;
+      }
+      if (message === "ViewData initializer missing.") {
+        response.status(500).json({ error: message });
         return;
       }
       response.status(500).json({ error: "Unexpected server error." });

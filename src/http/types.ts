@@ -43,6 +43,14 @@ export interface IHttpResponse {
    * @param payload - Serializable response body.
    */
   json(payload: unknown): void;
+
+  /**
+   * Sets an HTTP header on the response.
+   *
+   * @param name - Header name.
+   * @param value - Header value.
+   */
+  setHeader(name: string, value: string): void;
 }
 
 /**
