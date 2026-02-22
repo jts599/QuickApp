@@ -9,16 +9,14 @@ Implemented core pieces:
 - `BaseViewController<T>` lifecycle hooks, including `createViewData`.
 - Context split (`IContextBase`, `IContext<T>`).
 - SQLite-backed ViewData store (`SqliteViewDataStore`).
+- Framework migration subsystem with SQLite runner and versioned SQL files (`src/migrations/`).
 - Per-session view lock manager.
 - RPC handler for `POST /rpc/view/:key` with `{ method, args }`.
 - Sample controller in `sampleImplementation/server/sample.ts`.
 
 Missing pieces:
-- SQLite schema/migration for `view_data` table.
-- JWT-based `ISessionManager` implementation.
-- Express adapter that maps requests/responses to the framework handler.
 - Client generator for typed ViewController calls + per-view mutex.
-- Tests, build tooling, and runtime configuration docs.
+- Runtime configuration docs and production hardening.
 
 ## Directory Layout
 - `src/` framework runtime (controllers, RPC handler, persistence, types).
@@ -29,6 +27,7 @@ Missing pieces:
 - Route: `POST /rpc/view/:key`
 - Body: `{ method: string, args: unknown }`
 - Response: `{ result, viewData }`
+- Authorization failures return `403` with `{ error: "Forbidden." }` when session roles do not satisfy controller or callable role constraints.
 
 ## ViewData Persistence
 ViewData is stored in SQLite by `session_id + view_key` and hydrated before each call. Suggested schema:
@@ -42,6 +41,12 @@ CREATE TABLE IF NOT EXISTS view_data (
   PRIMARY KEY (session_id, view_key)
 );
 ```
+
+## Framework DB Migrations
+- Framework schema migrations are versioned SQL files under `src/migrations/sqlite/sql/`.
+- Run framework migrations manually from sample app:
+  - `cd sampleImplementation && npm run migrate`
+- Framework DB is intended to be separate from your application DB connection.
 
 ## Example ViewController
 ```ts
@@ -65,7 +70,13 @@ export class SampleViewController extends BaseViewController<ISampleViewData> {
 ```
 
 ## Development Notes
-- No build/test commands are configured yet.
+- Root commands:
+  - `npm run typecheck`
+  - `npm run build`
+  - `npm test`
+- Sample commands:
+  - `cd sampleImplementation && npm run build`
+  - `cd sampleImplementation && npm run migrate`
 - All code must follow `/.codex/instructions/CodeStyle.md` (mandatory documentation + low complexity).
 
 ## Usage Example (Stub Session + RPC)
@@ -73,11 +84,12 @@ export class SampleViewController extends BaseViewController<ISampleViewData> {
 import {
   createViewRpcHandler,
   registerViewRpcRoutes,
+  runFrameworkMigrations,
   InMemoryRefreshTokenStore,
   InMemorySessionManager,
   JwtTokenService,
   ViewLockManager,
-} from "./src";
+} from "./src/index.js";
 
 const tokenService = new JwtTokenService({
   secret: "dev-secret",
@@ -95,11 +107,17 @@ const sessionManager = new InMemorySessionManager(
   }
 );
 
+await runFrameworkMigrations({
+  dialect: "sqlite",
+  database: /* framework SQLite DB instance */,
+  logger: console,
+});
+
 const handler = createViewRpcHandler({
   sessionManager,
   viewDataStore: /* SqliteViewDataStore instance */,
   lockManager: new ViewLockManager(),
-  databaseConnection: /* SQLite db instance */,
+  databaseConnection: /* application DB connection */,
   logger: console,
   requestIdFactory: () => crypto.randomUUID(),
 });

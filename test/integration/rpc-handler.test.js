@@ -75,6 +75,24 @@ function createMockResponse() {
 }
 
 /**
+ * Creates a mock request object for the sample controller RPC call.
+ *
+ * @param {string} accessToken - Access token placed in Authorization header.
+ * @param {number} increment - Amount to add to the view counter.
+ * @returns {object} Mock request object.
+ */
+function createSampleRequest(accessToken, increment) {
+  return {
+    params: { key: "SampleView" },
+    body: {
+      method: "SampleViewControllerMethod",
+      args: { arg1: "hello", arg2: increment },
+    },
+    headers: { authorization: `Bearer ${accessToken}` },
+  };
+}
+
+/**
  * Creates session manager for tests.
  *
  * @returns Session manager instance.
@@ -105,12 +123,7 @@ test("RPC handler loads and persists view data", async () => {
   });
 
   const request = {
-    params: { key: "SampleView" },
-    body: {
-      method: "SampleViewControllerMethod",
-      args: { arg1: "hello", arg2: 2 },
-    },
-    headers: { authorization: `Bearer ${auth.tokens.accessToken}` },
+    ...createSampleRequest(auth.tokens.accessToken, 2),
   };
 
   const response = createMockResponse();
@@ -121,4 +134,99 @@ test("RPC handler loads and persists view data", async () => {
   assert.equal(response.body.viewData.counter, 2);
   assert.ok(response.headers["x-access-token"]);
   assert.ok(response.headers["x-refresh-token"]);
+});
+
+test("RPC handler persists view data across multiple calls in the same session", async () => {
+  const sessionManager = createSessionManager();
+  const auth = await sessionManager.authenticateUser({ username: "user" });
+  const viewDataStore = new InMemoryViewDataStore();
+
+  const handler = createViewRpcHandler({
+    sessionManager,
+    viewDataStore,
+    lockManager: new ViewLockManager(),
+    databaseConnection: {},
+    logger: console,
+    requestIdFactory: () => "test-request",
+  });
+
+  const firstResponse = createMockResponse();
+  await handler(createSampleRequest(auth.tokens.accessToken, 2), firstResponse);
+  assert.equal(firstResponse.statusCode, 200);
+  assert.equal(firstResponse.body.viewData.counter, 2);
+
+  const secondResponse = createMockResponse();
+  await handler(createSampleRequest(auth.tokens.accessToken, 3), secondResponse);
+  assert.equal(secondResponse.statusCode, 200);
+  assert.equal(secondResponse.body.viewData.counter, 5);
+});
+
+test("RPC handler isolates persisted view data per session", async () => {
+  const sessionManager = createSessionManager();
+  const authSessionA = await sessionManager.authenticateUser({ username: "user-a" });
+  const authSessionB = await sessionManager.authenticateUser({ username: "user-b" });
+  const viewDataStore = new InMemoryViewDataStore();
+
+  const handler = createViewRpcHandler({
+    sessionManager,
+    viewDataStore,
+    lockManager: new ViewLockManager(),
+    databaseConnection: {},
+    logger: console,
+    requestIdFactory: () => "test-request",
+  });
+
+  const sessionAFirst = createMockResponse();
+  await handler(createSampleRequest(authSessionA.tokens.accessToken, 2), sessionAFirst);
+  assert.equal(sessionAFirst.statusCode, 200);
+  assert.equal(sessionAFirst.body.viewData.counter, 2);
+
+  const sessionBFirst = createMockResponse();
+  await handler(createSampleRequest(authSessionB.tokens.accessToken, 4), sessionBFirst);
+  assert.equal(sessionBFirst.statusCode, 200);
+  assert.equal(sessionBFirst.body.viewData.counter, 4);
+
+  const sessionASecond = createMockResponse();
+  await handler(createSampleRequest(authSessionA.tokens.accessToken, 3), sessionASecond);
+  assert.equal(sessionASecond.statusCode, 200);
+  assert.equal(sessionASecond.body.viewData.counter, 5);
+});
+
+test("RPC handler returns 403 when session roles do not match controller/callable roles", async () => {
+  const unauthorizedSessionManager = {
+    async requireSession() {
+      return {
+        sessionInfo: {
+          userId: "user",
+          sessionId: "session",
+          roles: ["unauthorizedRole"],
+        },
+      };
+    },
+  };
+
+  const handler = createViewRpcHandler({
+    sessionManager: /** @type {any} */ (unauthorizedSessionManager),
+    viewDataStore: new InMemoryViewDataStore(),
+    lockManager: new ViewLockManager(),
+    databaseConnection: {},
+    logger: console,
+    requestIdFactory: () => "test-request",
+  });
+
+  const response = createMockResponse();
+  await handler(
+    {
+      params: { key: "SampleView" },
+      body: {
+        method: "SampleViewControllerMethod",
+        args: { arg1: "hello", arg2: 1 },
+      },
+      headers: {},
+    },
+    response
+  );
+
+  assert.equal(response.statusCode, 403);
+  assert.equal(response.body.error, "Forbidden.");
 });

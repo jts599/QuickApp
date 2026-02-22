@@ -44,12 +44,27 @@ interface ISampleDatabase {
 }
 
 /**
+ * Options used to create the sample Express server.
+ */
+export interface ISampleServerOptions {
+  /**
+   * Framework database used for framework-owned persistence such as view data.
+   */
+  frameworkDatabase: ISampleDatabase;
+
+  /**
+   * Application database connection exposed to request context consumers.
+   */
+  applicationDatabaseConnection: unknown;
+}
+
+/**
  * Creates a sample Express server with RPC wiring.
  *
- * @param database - SQLite database instance used for ViewData persistence.
+ * @param options - Server creation options.
  * @returns Configured Express app.
  */
-export function createSampleServer(database: ISampleDatabase): express.Express {
+export function createSampleServer(options: ISampleServerOptions): express.Express {
   void SampleViewController;
   void IntegrationTestViewController;
 
@@ -74,9 +89,9 @@ export function createSampleServer(database: ISampleDatabase): express.Express {
 
   registerViewRpcRoutes(app, {
     sessionManager,
-    viewDataStore: new SqliteViewDataStore(database),
+    viewDataStore: new SqliteViewDataStore(options.frameworkDatabase),
     lockManager: new ViewLockManager(),
-    databaseConnection: database,
+    databaseConnection: options.applicationDatabaseConnection,
     logger: console,
     requestIdFactory: () => randomUUID(),
   });

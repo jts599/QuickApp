@@ -134,6 +134,47 @@ function resolveCallable(
 }
 
 /**
+ * Checks whether session roles satisfy an allowed-role constraint.
+ *
+ * @param sessionRoles - Roles assigned to the active session.
+ * @param allowedRoles - Allowed roles for the target controller or method.
+ * @returns True when access should be granted.
+ */
+function hasRequiredRole(
+  sessionRoles: string[] | undefined,
+  allowedRoles: string[] | undefined
+): boolean {
+  if (!allowedRoles || allowedRoles.length === 0) {
+    return true;
+  }
+  if (!sessionRoles || sessionRoles.length === 0) {
+    return false;
+  }
+  return allowedRoles.some((role) => sessionRoles.includes(role));
+}
+
+/**
+ * Validates role-based access for controller and callable metadata.
+ *
+ * @param entry - Resolved controller entry.
+ * @param callable - Resolved callable metadata.
+ * @param sessionRoles - Roles assigned to the active session.
+ * @throws {Error} When role constraints are not satisfied.
+ */
+function assertRoleAccess(
+  entry: ViewControllerEntry,
+  callable: CallableMetadata,
+  sessionRoles: string[] | undefined
+): void {
+  if (!hasRequiredRole(sessionRoles, entry.config.roles)) {
+    throw new Error("Forbidden.");
+  }
+  if (!hasRequiredRole(sessionRoles, callable.config.allowedRoles)) {
+    throw new Error("Forbidden.");
+  }
+}
+
+/**
  * Writes refreshed tokens to the response headers.
  *
  * @param response - HTTP response.
@@ -267,6 +308,7 @@ export function createViewRpcHandler(
       const resolved = resolveCallable(controllerKey, body.method);
       const sessionResult = await dependencies.sessionManager.requireSession(request);
       const sessionInfo = sessionResult.sessionInfo;
+      assertRoleAccess(resolved.entry, resolved.callable, sessionInfo.roles);
       const lockRelease = await dependencies.lockManager.acquire(
         sessionInfo.sessionId,
         controllerKey
@@ -332,6 +374,10 @@ export function createViewRpcHandler(
       }
       if (message === "ViewController not found." || message === "Callable method not found.") {
         response.status(404).json({ error: message });
+        return;
+      }
+      if (message === "Forbidden.") {
+        response.status(403).json({ error: message });
         return;
       }
       if (message === "ViewData initializer missing.") {

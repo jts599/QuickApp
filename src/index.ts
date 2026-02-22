@@ -6,6 +6,7 @@ export * from "./context/types.js";
 export * from "./http/types.js";
 export * from "./http/expressAdapter.js";
 export * from "./http/expressAutoRoutes.js";
+export * from "./migrations/index.js";
 export * from "./rpc/createViewRpcHandler.js";
 export * from "./session/types.js";
 export * from "./session/tokenService.js";
